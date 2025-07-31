@@ -13,6 +13,8 @@ export async function GET() {
 
         const userId = session.user.id;
 
+
+
         const jobs = await prisma.job.findMany({
             where: {
                 postedById: userId,
