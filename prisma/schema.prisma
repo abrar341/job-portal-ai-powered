@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  firstName      String
+  lastName       String
+  headline       String?
+  bio            String?
+  location       String?
+  phone          String?
+  profileImage   String?
+
+  // JobSeeker-only fields
+  resume         String?  // Resume file URL
+  skills         Skill[] // String array of skills
+  experience     String?
+  education      String?
+  role           Role     @default(SEEKER)
+
+  // Recruiter-only fields
+  companyName    String?
+  companyWebsite String?
+  designation    String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  jobs           Job[]    @relation("PostedJobs")       // ← One-to-many from User to Job
+  applications   Application[]
+
+  accounts      Account[]     // Add this
+  sessions      Session[]     // Add this
+  emailVerified DateTime?     // Add this (used for optional email verification)
+  
+  // Dashboard related - interviews conducted by recruiter
+  interviews    Interview[]   @relation("InterviewConductor")
+  // Dashboard related - interviews attended by job seeker
+  candidateInterviews Interview[] @relation("InterviewCandidate")
+}
+
+model Skill {
+  id     String @id @default(cuid())
+  name   String
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+}
+
+model Job {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  location    String
+  jobType     JobType
+  salaryFrom  Int?
+  salaryTo    Int?
+  // Dashboard fields
+  isActive    Boolean     @default(true)  // Track active vs inactive jobs
+  expiresAt   DateTime?   // Optional expiration date
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  postedBy    User        @relation("PostedJobs", fields: [postedById], references: [id])
+  postedById  String
+  applications Application[]
+  interviews  Interview[]  // Jobs can have multiple interviews
+}
+
+// New model to track interviews for dashboard
+model Interview {
+  id          String    @id @default(cuid())
+  scheduledAt DateTime  // When interview is scheduled
+  duration    Int?      // Duration in minutes
+  status      InterviewStatus @default(SCHEDULED)
+  notes       String?   // Interview notes
+  feedback    String?   // Interview feedback
+  
+  // Relations
+  job         Job       @relation(fields: [jobId], references: [id])
+  jobId       String
+  
+  application Application @relation(fields: [applicationId], references: [id])
+  applicationId String
+  
+  // Who's conducting the interview (recruiter)
+  interviewer User      @relation("InterviewConductor", fields: [interviewerId], references: [id])
+  interviewerId String
+  
+  // Who's being interviewed (job seeker)
+  candidate   User      @relation("InterviewCandidate", fields: [candidateId], references: [id])
+  candidateId String
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// New model to track hiring decisions
+model Hire {
+  id          String    @id @default(cuid())
+  startDate   DateTime  // When candidate starts
+  salary      Int?      // Agreed salary
+  position    String    // Final position title
+  notes       String?   // Hiring notes
+  
+  // Relations - we can derive job and recruiter from application
+  application Application @relation(fields: [applicationId], references: [id])
+  applicationId String   @unique  // One hire per application
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Enhanced Application model to include hire relation
+model Application {
+  id         String    @id @default(cuid())
+  coverLetter String?
+  resumeUrl  String?   // Link to resume file or drive
+  // Dashboard fields
+  status     ApplicationStatus @default(APPLIED)  // Track application status
+  reviewedAt DateTime?  // When application was reviewed
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  job       Job     @relation(fields: [jobId], references: [id])
+  jobId     String
+
+  applicant User    @relation(fields: [applicantId], references: [id])
+  applicantId String
+  
+  // Relations for dashboard tracking
+  interviews Interview[]
+  hire      Hire?     // Optional hire decision
+}
+
+// Enum for job type
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  REMOTE
+  INTERNSHIP
+}
+
+enum Role {
+  SEEKER
+  RECRUITER
+  ADMIN
+}
+
+enum ApplicationStatus {
+  APPLIED
+  REVIEWED      // Added for dashboard tracking
+  SHORTLISTED
+  INTERVIEW_SCHEDULED  // Added for dashboard tracking
+  REJECTED
+  HIRED
+}
+
+// New enum for interview status
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? 
+  access_token       String? 
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

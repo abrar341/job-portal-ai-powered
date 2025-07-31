@@ -1,0 +1,404 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+export default function JobCreateModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  recruiterId,
+  editingJob = null,
+}) {
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    location: "",
+    jobType: "FULL_TIME",
+    salaryFrom: "",
+    salaryTo: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errors, setErrors] = useState({});
+
+  // Reset form when modal opens/closes or when editing job changes
+  useEffect(() => {
+    if (isOpen) {
+      if (editingJob) {
+        // Fill form with existing job data for editing
+        setForm({
+          title: editingJob.title || "",
+          description: editingJob.description || "",
+          location: editingJob.location || "",
+          jobType: editingJob.jobType || "FULL_TIME",
+          salaryFrom: editingJob.salaryFrom
+            ? String(editingJob.salaryFrom)
+            : "",
+          salaryTo: editingJob.salaryTo ? String(editingJob.salaryTo) : "",
+        });
+      } else {
+        // Reset form for new job
+        setForm({
+          title: "",
+          description: "",
+          location: "",
+          jobType: "FULL_TIME",
+          salaryFrom: "",
+          salaryTo: "",
+        });
+      }
+      setMessage("");
+      setErrors({});
+    }
+  }, [isOpen, editingJob]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!form.title.trim()) {
+      newErrors.title = "Job title is required";
+    }
+
+    if (!form.description.trim()) {
+      newErrors.description = "Job description is required";
+    }
+
+    if (!form.location.trim()) {
+      newErrors.location = "Location is required";
+    }
+
+    if (
+      form.salaryFrom &&
+      form.salaryTo &&
+      parseInt(form.salaryFrom) > parseInt(form.salaryTo)
+    ) {
+      newErrors.salaryFrom = "Salary from cannot be greater than salary to";
+    }
+
+    return newErrors;
+  };
+
+  const handleSubmit = async () => {
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const url = editingJob
+        ? `/api/jobs/${editingJob.id}`
+        : "/api/jobs/create";
+      const method = editingJob ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          salaryFrom: form.salaryFrom ? parseInt(form.salaryFrom) : null,
+          salaryTo: form.salaryTo ? parseInt(form.salaryTo) : null,
+          postedById: recruiterId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const successMessage = editingJob
+          ? "Job updated successfully!"
+          : "Job posted successfully!";
+        setMessage(successMessage);
+
+        // Call onSuccess callback to refresh the jobs list
+        if (onSuccess) {
+          onSuccess();
+        }
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        setMessage(data.message || "Something went wrong");
+      }
+    } catch (error) {
+      console.error("Error saving job:", error);
+      setMessage("Error saving job. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!loading) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-800">
+              {editingJob ? "Edit Job" : "Post a New Job"}
+            </h1>
+            <button
+              onClick={handleClose}
+              disabled={loading}
+              className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {/* Success/Error Message */}
+          {message && (
+            <div
+              className={`mb-6 p-4 rounded-lg ${
+                message.includes("successfully")
+                  ? "bg-green-50 border border-green-200 text-green-700"
+                  : "bg-red-50 border border-red-200 text-red-700"
+              }`}
+            >
+              {message}
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {/* Basic Job Information */}
+            <div className="bg-gray-50 rounded-xl p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">
+                Basic Job Information
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Job Title *
+                  </label>
+                  <input
+                    type="text"
+                    name="title"
+                    value={form.title}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      errors.title
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
+                    placeholder="e.g., Senior Software Engineer"
+                  />
+                  {errors.title && (
+                    <p className="text-red-500 text-sm mt-1">{errors.title}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Location *
+                  </label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={form.location}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      errors.location
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
+                    placeholder="e.g., San Francisco, CA"
+                  />
+                  {errors.location && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.location}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Job Type
+                  </label>
+                  <select
+                    name="jobType"
+                    value={form.jobType}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <option value="FULL_TIME">Full-Time</option>
+                    <option value="PART_TIME">Part-Time</option>
+                    <option value="CONTRACT">Contract</option>
+                    <option value="REMOTE">Remote</option>
+                    <option value="INTERNSHIP">Internship</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Job Description *
+                  </label>
+                  <textarea
+                    name="description"
+                    value={form.description}
+                    onChange={handleChange}
+                    rows={6}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors resize-none ${
+                      errors.description
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
+                    placeholder="Describe the job role, responsibilities, requirements, and what you're looking for in a candidate..."
+                  />
+                  {errors.description && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Salary Information */}
+            <div className="bg-gray-50 rounded-xl p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">
+                Salary Information
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Salary From
+                  </label>
+                  <input
+                    type="number"
+                    name="salaryFrom"
+                    value={form.salaryFrom}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      errors.salaryFrom
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
+                    placeholder="e.g., 80000"
+                  />
+                  {errors.salaryFrom && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.salaryFrom}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Salary To
+                  </label>
+                  <input
+                    type="number"
+                    name="salaryTo"
+                    value={form.salaryTo}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    placeholder="e.g., 120000"
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Leave salary fields empty if you prefer not to disclose
+                compensation details.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={loading}
+                className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className={`px-8 py-3 rounded-lg text-white font-medium transition-colors ${
+                  loading
+                    ? "bg-blue-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {loading ? (
+                  <span className="flex items-center">
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    {editingJob ? "Updating Job..." : "Posting Job..."}
+                  </span>
+                ) : editingJob ? (
+                  "Update Job"
+                ) : (
+                  "Post Job"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
