@@ -12,7 +12,7 @@ export default function SearchBar() {
   };
 
   return (
-    <div className="bg-white rounded shadow flex items-center p-2 max-w-xl">
+    <div className="bg-white border-2 rounded shadow flex items-center p-2 max-w-xl">
       <Search className="text-gray-400 ml-2" />
       <input
         type="text"
