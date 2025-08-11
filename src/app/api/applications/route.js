@@ -117,6 +117,16 @@ export async function GET(req) {
                         jobType: true,
                     },
                 },
+                hire: {
+                    select: {
+                        id: true,
+                        startDate: true,
+                        salary: true,
+                        position: true,
+                        notes: true,
+                        createdAt: true,
+                    },
+                },
             },
         });
 

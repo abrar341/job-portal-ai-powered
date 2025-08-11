@@ -60,11 +60,11 @@ export default function ApplicationModal({
           value={coverLetter}
           onChange={(e) => setCoverLetter(e.target.value)}
         />
-        <input
+        {/* <input
           type="file"
           accept=".pdf,.doc,.docx"
           onChange={(e) => setResume(e.target.files?.[0] || null)}
-        />
+        /> */}
         <div className="flex justify-between">
           <button
             type="submit"
